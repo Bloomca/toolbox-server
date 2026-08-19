@@ -20,9 +20,38 @@ type createShareRequest struct {
 	Data *string `json:"data"`
 }
 
-func getShare(w http.ResponseWriter, r *http.Request) {
-	log.Printf("get share: id=%q", r.PathValue("id"))
-	notFound(w, r)
+func getShare(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		log.Printf("get share: id=%q", id)
+
+		var data string
+		if err := db.QueryRowContext(
+			r.Context(),
+			"SELECT json FROM shared_spins WHERE id = ?",
+			id,
+		).Scan(&data); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				notFound(w, r)
+				return
+			}
+
+			log.Printf("get shared spin: %v", err)
+			writeShareError(w, http.StatusInternalServerError, "internal server error")
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(struct {
+			ID   string `json:"id"`
+			Data string `json:"data"`
+		}{
+			ID:   id,
+			Data: data,
+		}); err != nil {
+			log.Printf("write shared spin response: %v", err)
+		}
+	}
 }
 
 func createShare(db *sql.DB) http.HandlerFunc {

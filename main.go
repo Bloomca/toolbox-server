@@ -47,7 +47,7 @@ func server(db *sql.DB) http.Handler {
 		_, _ = w.Write([]byte("ok\n"))
 	})
 	mux.HandleFunc("POST /api/spinny/share", createShare(db))
-	mux.HandleFunc("GET /api/spinny/share/{id}", getShare)
+	mux.HandleFunc("GET /api/spinny/share/{id}", getShare(db))
 	mux.HandleFunc("/", notFound)
 
 	return mux
