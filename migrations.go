@@ -12,7 +12,18 @@ type migration struct {
 }
 
 var migrations = []migration{
-	// Migrations are appended here in order.
+	{
+		name: "create_shared_spins",
+		up: `
+CREATE TABLE shared_spins (
+	id TEXT PRIMARY KEY NOT NULL
+		CHECK (length(id) = 22),
+	json TEXT NOT NULL
+		CHECK (json_valid(json))
+		CHECK (length(CAST(json AS BLOB)) <= 8192)
+) STRICT, WITHOUT ROWID;
+`,
+	},
 }
 
 func migrate(db *sql.DB) error {
