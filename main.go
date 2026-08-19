@@ -34,19 +34,19 @@ func main() {
 	address := ":" + port
 	log.Printf("listening on %s", address)
 
-	if err := http.ListenAndServe(address, server()); err != nil {
+	if err := http.ListenAndServe(address, server(db)); err != nil {
 		log.Fatalf("server stopped: %v", err)
 	}
 }
 
-func server() http.Handler {
+func server(db *sql.DB) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok\n"))
 	})
-	mux.HandleFunc("POST /api/spinny/share", createShare)
+	mux.HandleFunc("POST /api/spinny/share", createShare(db))
 	mux.HandleFunc("GET /api/spinny/share/{id}", getShare)
 	mux.HandleFunc("/", notFound)
 
