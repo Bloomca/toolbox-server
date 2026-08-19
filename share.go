@@ -10,7 +10,7 @@ import (
 
 func getShare(w http.ResponseWriter, r *http.Request) {
 	log.Printf("get share: id=%q", r.PathValue("id"))
-	http.NotFound(w, r)
+	notFound(w, r)
 }
 
 func createShare(w http.ResponseWriter, _ *http.Request) {

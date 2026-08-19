@@ -29,6 +29,13 @@ func server() http.Handler {
 	})
 	mux.HandleFunc("POST /api/spinny/share", createShare)
 	mux.HandleFunc("GET /api/spinny/share/{id}", getShare)
+	mux.HandleFunc("/", notFound)
 
 	return mux
+}
+
+func notFound(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusNotFound)
+	_, _ = w.Write([]byte("{\"status\":404,\"error\":\"not found\"}\n"))
 }
