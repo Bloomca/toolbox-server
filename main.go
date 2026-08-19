@@ -1,15 +1,34 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
 	"os"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
 		log.Fatal("PORT environment variable is required")
+	}
+
+	databasePath := os.Getenv("DATABASE_PATH")
+	if databasePath == "" {
+		log.Fatal("DATABASE_PATH environment variable is required")
+	}
+
+	db, err := sql.Open("sqlite3", databasePath)
+	if err != nil {
+		log.Fatalf("open database: %v", err)
+	}
+	defer db.Close()
+
+	db.SetMaxOpenConns(1)
+	if err := migrate(db); err != nil {
+		log.Fatalf("migrate database: %v", err)
 	}
 
 	address := ":" + port
