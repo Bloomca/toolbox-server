@@ -27,6 +27,7 @@ func server() http.Handler {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok\n"))
 	})
+	mux.HandleFunc("POST /api/spinny/share", createShare)
 
 	return mux
 }
