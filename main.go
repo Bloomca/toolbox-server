@@ -28,6 +28,7 @@ func server() http.Handler {
 		_, _ = w.Write([]byte("ok\n"))
 	})
 	mux.HandleFunc("POST /api/spinny/share", createShare)
+	mux.HandleFunc("GET /api/spinny/share/{id}", getShare)
 
 	return mux
 }

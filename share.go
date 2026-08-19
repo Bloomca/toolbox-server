@@ -8,6 +8,11 @@ import (
 	"net/http"
 )
 
+func getShare(w http.ResponseWriter, r *http.Request) {
+	log.Printf("get share: id=%q", r.PathValue("id"))
+	http.NotFound(w, r)
+}
+
 func createShare(w http.ResponseWriter, _ *http.Request) {
 	id, err := randomID()
 	if err != nil {
