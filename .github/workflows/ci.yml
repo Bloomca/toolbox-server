@@ -38,7 +38,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: checks
     runs-on: ubuntu-latest
-    environment: production
+    environment: VPS
     concurrency:
       group: toolbox-server-production
       cancel-in-progress: false
