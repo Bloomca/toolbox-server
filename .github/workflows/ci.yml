@@ -32,3 +32,105 @@ jobs:
 
       - name: Run tests
         run: go test ./...
+
+  deploy:
+    name: Build and deploy
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: checks
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: toolbox-server-production
+      cancel-in-progress: false
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install static build toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes musl-tools
+
+      - name: Build static Linux binary
+        env:
+          CC: musl-gcc
+          CGO_ENABLED: "1"
+          GOARCH: amd64
+          GOOS: linux
+        run: |
+          go build \
+            -trimpath \
+            -tags "netgo osusergo sqlite_omit_load_extension" \
+            -ldflags '-s -w -linkmode external -extldflags "-static"' \
+            -o toolbox-server \
+            .
+          file toolbox-server
+
+      - name: Configure SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -eu
+          : "${VPS_HOST:?VPS_HOST is required}"
+          : "${VPS_KNOWN_HOSTS:?VPS_KNOWN_HOSTS is required}"
+          : "${VPS_SSH_KEY:?VPS_SSH_KEY is required}"
+          : "${VPS_USER:?VPS_USER is required}"
+
+          port="${VPS_SSH_PORT:-22}"
+          install -d -m 0700 "$HOME/.ssh"
+          printf '%s\n' "$VPS_SSH_KEY" > "$HOME/.ssh/deploy_key"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 0600 "$HOME/.ssh/deploy_key" "$HOME/.ssh/known_hosts"
+
+          cat > "$HOME/.ssh/config" <<EOF
+          Host production
+            HostName $VPS_HOST
+            User $VPS_USER
+            Port $port
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            BatchMode yes
+            StrictHostKeyChecking yes
+          EOF
+          chmod 0600 "$HOME/.ssh/config"
+
+      - name: Upload binary
+        run: scp toolbox-server "production:/opt/toolbox-server/toolbox-server.${GITHUB_SHA}"
+
+      - name: Activate deployment
+        run: |
+          ssh production "bash -s -- '$GITHUB_SHA'" <<'REMOTE'
+          set -euo pipefail
+
+          sha="$1"
+          directory="/opt/toolbox-server"
+          candidate="$directory/toolbox-server.$sha"
+          binary="$directory/toolbox-server"
+
+          chmod 0755 "$candidate"
+          mv -f "$candidate" "$binary"
+
+          if sudo /usr/bin/systemctl restart toolbox-server.service && \
+             /usr/bin/systemctl is-active --quiet toolbox-server.service; then
+            for _ in $(seq 1 20); do
+              if curl --fail --silent http://127.0.0.1:8080/api/health >/dev/null; then
+                exit 0
+              fi
+              sleep 1
+            done
+          fi
+
+          /usr/bin/systemctl status toolbox-server.service --no-pager || true
+          exit 1
+          REMOTE
